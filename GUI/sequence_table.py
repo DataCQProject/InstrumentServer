@@ -11,7 +11,8 @@ class StepSequenceTreeWidget(QTreeWidget):
         super().__init__()
         self.logger = logger
 
-        # dictionary for added channels in the table
+        # dictionary for available channels
+        # key -> Instrument Name, value -> InstrumentManager object
         self.channels_added = channels_added
 
         # dictionary for quantities of each added channel
@@ -19,7 +20,7 @@ class StepSequenceTreeWidget(QTreeWidget):
         # value: SequenceConstructor object
         self.quantities_added = dict()
 
-        self.setDragEnabled(True) # TODO: Disable manual rearrangement
+        self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
          # Disabling arrows in the Tree Widget
@@ -52,18 +53,26 @@ class StepSequenceTreeWidget(QTreeWidget):
         return self.quantities_added.keys()
 
     def check_item_valid(self, instrument_name, quantity_name):
-        # Check if the channel already exists
+        """Returns False if the quantity already exists in this table so that it cannot be added again or elsewhere""" 
         if (instrument_name, quantity_name) in self.quantities_added.keys():
             return False
         return True
 
     def dragEnterEvent(self, event):
+        """
+        Implements drag enter event
+        Accepts only a json mime data object (dictionary created in Channels Table drag)
+        """
         if event.mimeData().hasFormat('application/json'):
             event.accept()
         else:
             event.ignore()
 
     def dragMoveEvent(self, event):
+        """
+        Implements drag move event
+        Accepts only a json mime data object (dictionary created in Channels Table drag)
+        """
         if event.mimeData().hasFormat('application/json'):
             byte_data = event.mimeData().data('application/json')
             json_string = str(byte_data, 'utf-8')
@@ -77,6 +86,11 @@ class StepSequenceTreeWidget(QTreeWidget):
             event.ignore()
 
     def dropEvent(self, event):
+        """
+        Adds dragged Implements drag drop event to add quantity to this table
+        Accepts only a json mime data object (dictionary created in Channels Table drag)
+        Adds a sequence for this quantity using SequenceConstructor
+        """
         if event.mimeData().hasFormat('application/json'):
             byte_data = event.mimeData().data('application/json')
             json_string = str(byte_data, 'utf-8')
@@ -85,7 +99,6 @@ class StepSequenceTreeWidget(QTreeWidget):
             instrument_name = data_dict['instrument_name']
             quantity_name = data_dict['quantity_name']
 
-            # TODO: Remove
             if (instrument_name, quantity_name) in self.quantities_added.keys():
                 event.ignore()
                 return
@@ -101,6 +114,7 @@ class StepSequenceTreeWidget(QTreeWidget):
             event.ignore()
 
     def add_tree_item(self, sequence_constructor):
+        """Adds a QTreeWidgetItem for a quantity with its step sequence data"""
         instrument_name = sequence_constructor.instrument_name
         quantity_name = sequence_constructor.quantity_name
         level = sequence_constructor.level
@@ -118,6 +132,7 @@ class StepSequenceTreeWidget(QTreeWidget):
             QTreeWidgetItem(self, [str(level), instrument_name, quantity_name, str(points), str(start) + unit +' - '+ str(stop) + unit])
 
     def show_sequence_constructor_gui(self, selected_item, column=None):
+        """Displays a quantity's SequenceConstructor dialog and updates the QTreeWidgetItem with the modified step sequence data"""
         instrument_name = selected_item.text(1)
         quantity_name = selected_item.text(2)
         if (instrument_name, quantity_name) in self.quantities_added.keys():
@@ -142,8 +157,8 @@ class StepSequenceTreeWidget(QTreeWidget):
             self.update_tree()
         return
 
-    """ Removes a selected quantitiy sequence from the Step Sequence Table """
     def remove_quantity(self):
+        """Removes a selected quantitiy sequence from the Step Sequence Table"""
         selected_item = self.currentItem()
         if selected_item is not None:     
             instrument_name = selected_item.text(1)
@@ -151,8 +166,8 @@ class StepSequenceTreeWidget(QTreeWidget):
             del self.quantities_added[(instrument_name, quantity_name)]
             self.takeTopLevelItem(self.indexOfTopLevelItem(selected_item))
 
-    """ Removes all quantity sequences related to an instrument from the Step Sequence Table """
     def remove_channel(self, cute_name):
+        """Removes all quantity sequences related to an instrument from the Step Sequence Table"""
         if cute_name:
             # Traverse the tree in reverse to remove the tree widgets that belong to an instrument
             for index in range(self.topLevelItemCount() - 1, -1, -1):
@@ -163,14 +178,17 @@ class StepSequenceTreeWidget(QTreeWidget):
                     self.takeTopLevelItem(index)
 
     def update_tree(self):
-        # Sort the tree items based on level value
+        """Sort the tree items based on level value"""
         self.sortItems(0, Qt.SortOrder.AscendingOrder)  
 
     def step_sequence_table_selection_changed(self):
+        """Handle selection change in Step Sequence table. Implement if needed."""
         selected_item = self.currentItem()
         pass
 
     def validate_sequence(self):
+        """Check if the step sequences in the table are valid for an experiment
+        Check if quantities at the same level have the same number of points"""
         current_level = None
         current_points = None
         for i in range(self.topLevelItemCount()):
@@ -201,6 +219,7 @@ For single valued quantities, set 'start' and 'stop' to this value and change th
         return True
     
     def get_step_sequence_quantities(self):
+        """Provides input quantities and quantity sequences details for the Experiment DTO"""
         input_quantities = []
         quantity_sequences = {}
         current_level = None        

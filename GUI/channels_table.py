@@ -13,8 +13,12 @@ class ChannelsTreeWidget(QTreeWidget):
         self._parent_gui = parent_gui
         self.logger = logger
         # dictionary for added channels in the table
+        # key -> Instrument Name, value -> InstrumentManager object
         self.channels_added = channels_added
         # dictionary for quantities of each added channel
+        # format key -> instrument name
+        #        value -> dictionary of quantity and QuantityManager objects
+        # example: self.quantities_added[ins_name][qty_name] = QuanttityManager object
         # TODO: change dictionary layout to (ins, qty): quantity
         self.quantities_added = dict()
 
@@ -39,6 +43,7 @@ class ChannelsTreeWidget(QTreeWidget):
         self.itemDoubleClicked.connect(self.show_quantity_frame_gui)
 
     def add_channel_item(self, instrument_manager):
+        """Adds a connected instrument and all its quantities to the Channels table"""
         im = instrument_manager
         cute_name = im.name
         model = im.model_name
@@ -67,6 +72,7 @@ class ChannelsTreeWidget(QTreeWidget):
             self.parent.setExpanded(True)
 
     def get_value(self, quantity):
+        """Gets the value for the quantity, similar implentation as quantity frames in the instrument manager GUI"""
         try:
             value = quantity.get_value()
             self._handle_quant_value_change(quantity.name, value)
@@ -75,12 +81,8 @@ class ChannelsTreeWidget(QTreeWidget):
             self.logger.error(f"Error querying '{quantity.name}': {e}")
             QtW.QMessageBox.critical(self, f"Error querying '{quantity.name}'", str(e))
 
-    def handle_incoming_value(self, value):
-        """Handles any value returned by instrument to be properly displayed. Should be implemented by child class"""
-        pass
-        # raise NotImplementedError()
-
     def remove_channel(self):
+        """Removes a instrument and all its quantities from the Channels table"""
         selected_item = self.currentItem()
         if selected_item is not None:            
             if selected_item.childCount() > 0:
@@ -93,7 +95,8 @@ class ChannelsTreeWidget(QTreeWidget):
                 return cute_name
         return
     
-    def show_quantity_frame_gui(self, selected_item, column=None):   
+    def show_quantity_frame_gui(self, selected_item, column=None):
+        """Resuses quantity frames to modify the value of a quantitiy"""  
         parent_item = selected_item.parent()
         if parent_item is not None:
             quantity_name = selected_item.text(0)
@@ -138,8 +141,8 @@ class ChannelsTreeWidget(QTreeWidget):
             # This is to avoid having non-visible quantities being present in the Step Sequence and Log Channels table
             self._parent_gui.remove_experiment_quantities(cute_name)
 
-
     def channels_table_selection_changed(self):
+        """Handle selection change in Channels table. Implement if needed."""
         selected_item = self.currentItem()
         if selected_item is not None:
             if selected_item.childCount() == 0:
@@ -148,11 +151,13 @@ class ChannelsTreeWidget(QTreeWidget):
                 pass
 
     def startDrag(self, supportedActions):
+        """Drag functionality in initiation. Enable dragging of quantities from the Channel table"""
         selected_item = self.currentItem() # only a single item is configured to be selected at once
         parent_item = selected_item.parent()
         if not parent_item:
             return
         data_dict = {'instrument_name': parent_item.text(0), 'quantity_name': selected_item.text(0), 'address': parent_item.text(3)}
+        # drag data is a dictionary of instrument name, quantity name and instrument address
 
         # Serialize the dictionary as JSON
         mime_data = QMimeData()
@@ -163,6 +168,7 @@ class ChannelsTreeWidget(QTreeWidget):
 
 
 class AddChannelDialog(QDialog):
+    """Dialog box to display all connect instruments to be added to the channels table"""
     def __init__(self, connected_ins: dict):
         super().__init__()
 
@@ -192,6 +198,7 @@ class AddChannelDialog(QDialog):
         self.setLayout(layout)
 
     def get_selected_item(self):
+        """Returns the selected instrument name"""
         selected_item = self.tree_widget.currentItem()
         if selected_item is not None:
             return selected_item.text(0)
@@ -199,6 +206,7 @@ class AddChannelDialog(QDialog):
             return None
 
 class ModifyQuantity(QDialog):
+    """Uses quantity frame in a dialog box to modify its value"""
     def __init__(self, quantity, frame):
         super().__init__()
 

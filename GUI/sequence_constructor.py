@@ -23,19 +23,29 @@ class SequenceConstructor(QDialog):
 
         self.logger = logger
 
-        ''' value_flag: True if single point is selected. False if start and stop values are given.'''
+        """
+        Quantities can be set to two different types of values
+        Single point value - quantity is set at a constant value through out the experiment
+        Start stop values - quantity is varied from start to stop values through a list of points determined by one of two attributes
+                        step value -> divide [start, stop] into a list of points with 'step value' difference between each point
+                        number of points -> divide [start, stop] into a list of 'number of points' points
+        """
+
+        """value_flag: True if single point is selected. False if start and stop values are given."""
         self._value_flag = True
-        ''' step_flag: Applies if value_flag is false (a range is provided). True if step size is provided. False if number of steps is provided.'''
+        """step_flag: Applies if value_flag is false (a range is provided). True if step size is provided. False if number of steps is provided."""
         self._step_flag = False
         
-        self._level = 1
-        # self._single_point_value = self.get_value() # TODO: Error querying quantity
+        self._level = 1 # default level is set to 1
         self._single_point_value = None
         self._start_value = None
         self._stop_value = None
         self._fixed_step = None
         self._fixed_number_of_steps = 1
+
         # self._interpolation = "Linear"
+        # Currently Experiment Runner only creates linear list of points for a range (np.linspace(start, stop, points))
+        # This can be expanded to Logarithmic interlopation as well (np.logspace(start, stop, points))
 
         self.setWindowTitle("Step setup")
         self.lab_experiment_icon = QIcon("../Icons/labExperiment.png")
@@ -56,6 +66,7 @@ class SequenceConstructor(QDialog):
         self.group_box_layout.addWidget(separator)
         self.group_box_layout.addLayout(self.right_section_layout)
 
+        # Left section
         self.value_buttons_group = QButtonGroup()
         self.single_point_button = QRadioButton('Single point')
         self.value_buttons_group.addButton(self.single_point_button)        
@@ -70,6 +81,7 @@ class SequenceConstructor(QDialog):
         self.left_section_layout.addWidget(self.start_stop_button)
         self.left_section_layout.addLayout(self.start_stop_form_layout)
 
+        # Right section
         self.step_buttons_group = QButtonGroup()
         self.fixed_step_button = QRadioButton('Fixed step')
         self.step_buttons_group.addButton(self.fixed_step_button)        
@@ -84,13 +96,13 @@ class SequenceConstructor(QDialog):
         self.right_section_layout.addWidget(self.steps_number_button)
         self.right_section_layout.addLayout(self.steps_number_form_layout)
 
+        # Radio button connections
         self.single_point_button.toggled.connect(self.handle_value_checkboxes_toggle)
         self.start_stop_button.toggled.connect(self.handle_value_checkboxes_toggle)
+        """single point and start stop radio buttons are grouped together as value checkboxes"""
         self.fixed_step_button.toggled.connect(self.handle_step_checkboxes_toggle)
-        self.steps_number_button.toggled.connect(self.handle_step_checkboxes_toggle)
-        
-        
-        # use these in child classes to add widgets
+        self.steps_number_button.toggled.connect(self.handle_step_checkboxes_toggle)        
+        """fixed step and steps number radio buttons are grouped togetehr as step checkboxes""" 
 
         # Add level selector
         level_label = QLabel("Level:")
@@ -116,22 +128,6 @@ class SequenceConstructor(QDialog):
         self.layout.addLayout(bottom_layout)
         self.setLayout(self.layout)
 
-        '''
-        # Create menu for right click events
-        # Implemented into widget by subclasses
-        self.get_action = QAction('Query quantity value')
-        self.set_def_val_action = QAction('Set default value')
-        self.menu = QMenu()
-        self.menu.addAction(self.get_action)
-        self.menu.addAction(self.set_def_val_action)
-        '''
-
-    #######################################################################################################
-    @property
-    def value(self):
-        """Returns current value of the quantity by the given QWidget. Should be implemented by child class"""
-        raise NotImplementedError()
-    
     @property
     def instrument_name(self):
         return self._name
@@ -172,20 +168,7 @@ class SequenceConstructor(QDialog):
     def number_of_points(self):
         if self.value_flag:
             return 1
-        return self._fixed_number_of_steps
-    
-    #######################################################################################################
-
-
-    '''
-    # Can be modified to change format of the float values
-    def custom_context_menu_event(self):
-        action = self.menu.exec(QCursor.pos())
-        if action == self.get_action:
-            self.get_value()
-        elif action == self.set_def_val_action:
-            self.set_default_value()
-    '''
+        return self._fixed_number_of_steps    
 
     def get_value(self):
         try:
@@ -226,8 +209,10 @@ class SequenceConstructor(QDialog):
     def save_data(self):
         """Saves the sequence data"""
         raise NotImplementedError()
-
     
+####################################################################
+# Children Classes for different quantity data types
+####################################################################    
 class BooleanConstructor(SequenceConstructor):
     def __init__(self, quantity: QuantityManager, logger: logging.Logger):
         super().__init__(quantity, logger)
@@ -270,15 +255,8 @@ class BooleanConstructor(SequenceConstructor):
         
 
     def handle_value_checkboxes_toggle(self):
-        # Individually disable corresponding widgets
+        """Individually disable corresponding widgets when value checkboxes are toggled"""
         if self.single_point_button.isChecked():
-            # for i in range(layout.rowCount()):
-            #     item = layout.itemAt(i)
-            #     if item is not None:
-            #         widget_item = item.widget()
-            #         if widget_item is not None:
-            #             widget_item.setEnabled(False)
-
             self.single_point_label.setEnabled(True)
             self.single_point_combo_box.setEnabled(True)
 
@@ -293,7 +271,6 @@ class BooleanConstructor(SequenceConstructor):
             self.steps_number_button.setEnabled(False)
             self.steps_number_label.setEnabled(False)
             self.steps_number_spin_box.setEnabled(False)
-            # self.label.setText('Option 1 selected')
         else:
             self.single_point_label.setEnabled(False)
             self.single_point_combo_box.setEnabled(False)
@@ -304,24 +281,21 @@ class BooleanConstructor(SequenceConstructor):
             self.fixed_step_button.setEnabled(True)
             self.steps_number_button.setEnabled(True)
             self.handle_step_checkboxes_toggle()
-            # self.label.setText('Option 2 selected')
 
     def handle_step_checkboxes_toggle(self):
-        # Individually disable corresponding widgets
+        """Individually disable corresponding widgets when step checkboxes are toggled"""
         self.start_stop_button.setChecked(True)
         if self.fixed_step_button.isChecked():
             self.fixed_step_label.setEnabled(True)
             self.fixed_step_spin_box.setEnabled(True)
             self.steps_number_label.setEnabled(False)
             self.steps_number_spin_box.setEnabled(False)          
-            # self.label.setText('Option 1 selected')
         else:
             self.steps_number_button.setChecked(True)
             self.fixed_step_label.setEnabled(False)
             self.fixed_step_spin_box.setEnabled(False)
             self.steps_number_label.setEnabled(True)
             self.steps_number_spin_box.setEnabled(True)    
-            # self.label.setText('Option 2 selected')
         
     def save_data(self):
         """Saves the sequence data"""
@@ -348,17 +322,6 @@ class BooleanConstructor(SequenceConstructor):
         
         # Save user's data
         self.accept()
-    '''
-    @SequenceConstructor.value.getter
-    def value(self):
-        return self.true_radio_button.isChecked()
-
-    def handle_incoming_value(self, value):
-        self.true_radio_button.setChecked(value)
-        self.false_radio_button.setChecked(not value)
-        self.on_value_change(self.quantity.name, value)
-    '''
-
 
 class ButtonConstructor(SequenceConstructor):
     def __init__(self, quantity: QuantityManager, logger: logging.Logger):
@@ -405,15 +368,8 @@ class ComboConstructor(SequenceConstructor):
         
 
     def handle_value_checkboxes_toggle(self):
-        # Individually disable corresponding widgets
+        """Individually disable corresponding widgets when value checkboxes are toggled"""
         if self.single_point_button.isChecked():
-            # for i in range(layout.rowCount()):
-            #     item = layout.itemAt(i)
-            #     if item is not None:
-            #         widget_item = item.widget()
-            #         if widget_item is not None:
-            #             widget_item.setEnabled(False)
-
             self.single_point_label.setEnabled(True)
             self.single_point_combo_box.setEnabled(True)
 
@@ -428,7 +384,6 @@ class ComboConstructor(SequenceConstructor):
             self.steps_number_button.setEnabled(False)
             self.steps_number_label.setEnabled(False)
             self.steps_number_spin_box.setEnabled(False)
-            # self.label.setText('Option 1 selected')
         else:
             self.single_point_label.setEnabled(False)
             self.single_point_combo_box.setEnabled(False)
@@ -439,24 +394,21 @@ class ComboConstructor(SequenceConstructor):
             self.fixed_step_button.setEnabled(True)
             self.steps_number_button.setEnabled(True)
             self.handle_step_checkboxes_toggle()
-            # self.label.setText('Option 2 selected')
 
     def handle_step_checkboxes_toggle(self):
-        # Individually disable corresponding widgets
+        """Individually disable corresponding widgets when step checkboxes are toggled"""
         self.start_stop_button.setChecked(True)
         if self.fixed_step_button.isChecked():
             self.fixed_step_label.setEnabled(True)
             self.fixed_step_spin_box.setEnabled(True)
             self.steps_number_label.setEnabled(False)
             self.steps_number_spin_box.setEnabled(False)          
-            # self.label.setText('Option 1 selected')
         else:
             self.steps_number_button.setChecked(True)
             self.fixed_step_label.setEnabled(False)
             self.fixed_step_spin_box.setEnabled(False)
             self.steps_number_label.setEnabled(True)
             self.steps_number_spin_box.setEnabled(True)    
-            # self.label.setText('Option 2 selected')
         
     def save_data(self):
         """Saves the sequence data"""
@@ -542,7 +494,7 @@ class DoubleConstructor(SequenceConstructor):
         self.steps_number_spin_box.valueChanged.connect(self.steps_number_changed)
 
     def fixed_step_changed(self):
-        # TODO: Change logic
+        """Executes when fixed step value is changed. Calculates and sets number of steps for this new fixed step value"""
         if self.fixed_step_spin_box.value() != 0.0:
             new_number_of_points = (self.stop_spin_box.value() - self.start_spin_box.value()) / self.fixed_step_spin_box.value()
             new_number_of_points = round(new_number_of_points)
@@ -554,7 +506,7 @@ class DoubleConstructor(SequenceConstructor):
             self.steps_number_spin_box.setValue(0)
 
     def steps_number_changed(self):
-        # TODO: Change logic
+        """Executes when number of steps is changed. Calculates and sets fixed step value for this new number of points"""
         if self.steps_number_spin_box.value() >= 2:
             new_fixed_step = (self.stop_spin_box.value() - self.start_spin_box.value()) / float(self.steps_number_spin_box.value() - 1)
             self.fixed_step_spin_box.setValue(new_fixed_step)
@@ -562,15 +514,8 @@ class DoubleConstructor(SequenceConstructor):
             self.fixed_step_spin_box.setValue(0.0)
 
     def handle_value_checkboxes_toggle(self):
-        # Individually disable corresponding widgets
+        """Individually disable corresponding widgets when value checkboxes are toggled"""
         if self.single_point_button.isChecked():
-            # for i in range(layout.rowCount()):
-            #     item = layout.itemAt(i)
-            #     if item is not None:
-            #         widget_item = item.widget()
-            #         if widget_item is not None:
-            #             widget_item.setEnabled(False)
-
             self.single_point_label.setEnabled(True)
             self.single_point_spin_box.setEnabled(True)
 
@@ -585,7 +530,6 @@ class DoubleConstructor(SequenceConstructor):
             self.steps_number_button.setEnabled(False)
             self.steps_number_label.setEnabled(False)
             self.steps_number_spin_box.setEnabled(False)
-            # self.label.setText('Option 1 selected')
         else:
             self.single_point_label.setEnabled(False)
             self.single_point_spin_box.setEnabled(False)
@@ -596,24 +540,21 @@ class DoubleConstructor(SequenceConstructor):
             self.fixed_step_button.setEnabled(True)
             self.steps_number_button.setEnabled(True)
             self.handle_step_checkboxes_toggle()
-            # self.label.setText('Option 2 selected')
 
     def handle_step_checkboxes_toggle(self):
-        # Individually disable corresponding widgets
+        """Individually disable corresponding widgets when step checkboxes are toggled"""
         self.start_stop_button.setChecked(True)
         if self.fixed_step_button.isChecked():
             self.fixed_step_label.setEnabled(True)
             self.fixed_step_spin_box.setEnabled(True)
             self.steps_number_label.setEnabled(False)
             self.steps_number_spin_box.setEnabled(False)          
-            # self.label.setText('Option 1 selected')
         else:
             self.steps_number_button.setChecked(True)
             self.fixed_step_label.setEnabled(False)
             self.fixed_step_spin_box.setEnabled(False)
             self.steps_number_label.setEnabled(True)
             self.steps_number_spin_box.setEnabled(True)    
-            # self.label.setText('Option 2 selected')
         
     def save_data(self):
         """Saves the sequence data"""
@@ -662,7 +603,9 @@ class VectorComplexConstructor(SequenceConstructor):
 
 
 def sequence_constructor_factory(quantity: QuantityManager, logger: logging.Logger):
-    
+    """
+    Creates a sequence constructor object for quantities of each data type
+    """    
     match quantity.data_type.upper():
         case 'BOOLEAN':
             return BooleanConstructor(quantity, logger)
